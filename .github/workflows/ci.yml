@@ -38,8 +38,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/4-learn/devops-demo:${{ github.sha }}
-            ghcr.io/4-learn/devops-demo:latest
+            ghcr.io/wendyyeh137/devops-demo:${{ github.sha }}
+            ghcr.io/wendyyeh137/devops-demo:latest
 
       - name: Update Config Repo
         env:
@@ -49,7 +49,7 @@ jobs:
             echo "::warning::CONFIG_REPO_TOKEN 未設，略過更新 Config Repo（image 已推上 GHCR）"
             exit 0
           fi
-          git clone https://x-access-token:${CONFIG_REPO_TOKEN}@github.com/4-learn/devops-config.git
+          git clone https://x-access-token:${CONFIG_REPO_TOKEN}@github.com/wendyyeh137/devops-config.git
           cd devops-config
           sed -i "s|image: ghcr.io/.*/devops-demo:.*|image: ghcr.io/4-learn/devops-demo:${{ github.sha }}|" k8s/deployment.yaml
           git config user.name "github-actions"
