@@ -18,7 +18,7 @@ app.include_router(login_router)
 
 @app.get("/")
 def root():
-    return {"service": "order", "version": VERSION, "build": "v2"}
+    return {"service": "order", "version": VERSION, "build": "v3"}
 
 @app.get("/health")
 def health():
