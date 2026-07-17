@@ -1,0 +1,59 @@
+name: CI/CD
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:                              # ch3 / ch4：每次 push / PR 都跑 pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: pytest -v --cov=app --cov-fail-under=70
+
+  build-and-deploy:                  # ch6：測試過了，才 build → push GHCR → 更新 config repo
+    needs: test                      # ← 測試沒過不部署
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write                # ⭐ 推 image 到 GHCR 需要
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}     # ← 內建 token，免設
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/wendyyeh137/devops-demo:${{ github.sha }}
+            ghcr.io/wendyyeh137/devops-demo:latest
+
+      - name: Update Config Repo
+        env:
+          CONFIG_REPO_TOKEN: ${{ secrets.CONFIG_REPO_TOKEN }}
+        run: |
+          if [ -z "$CONFIG_REPO_TOKEN" ]; then
+            echo "::warning::CONFIG_REPO_TOKEN 未設，略過更新 Config Repo（image 已推上 GHCR）"
+            exit 0
+          fi
+          git clone https://x-access-token:${CONFIG_REPO_TOKEN}@github.com/wendyyeh137/devops-config.git
+          cd devops-config
+          sed -i "s|image: ghcr.io/.*/devops-demo:.*|image: ghcr.io/4-learn/devops-demo:${{ github.sha }}|" k8s/deployment.yaml
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add k8s/deployment.yaml
+          git commit -m "chore: update image to ${{ github.sha }}" || echo "no change"
+          git push
